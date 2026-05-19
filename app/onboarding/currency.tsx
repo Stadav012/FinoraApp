@@ -1,3 +1,6 @@
+import { Alert, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
+
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +19,28 @@ const CURRENCIES = [
 
 export default function CurrencyScreen() {
   const [selectedCurrency, setSelectedCurrency] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleContinue = async () => {
+    if (!selectedCurrency) return;
+    setIsLoading(true);
+
+    // getting currently logged user to update their profile with the selected currency
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ currency: selectedCurrency })
+        .eq('id', user.id);
+
+      if (error) {
+        console.error('Error updating currency:', error);
+      }
+    }
+    // if successfully updated, navigate to the next onboarding screen
+    setIsLoading(false);
+    router.push('/onboarding/goal' as any);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -67,10 +92,14 @@ export default function CurrencyScreen() {
         <TouchableOpacity
           style={[styles.continueButton, !selectedCurrency && styles.continueButtonDisabled]}
           activeOpacity={0.8}
-          onPress={() => router.push('/onboarding/goal' as any)}
-          disabled={!selectedCurrency}
+          onPress={handleContinue}
+          disabled={!selectedCurrency || isLoading}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          {isLoading ? (
+            <ActivityIndicator color={Colors.background} />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

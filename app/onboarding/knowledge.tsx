@@ -1,3 +1,5 @@
+import { Alert, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +15,30 @@ const LEVELS = [
 
 export default function KnowledgeScreen() {
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleContinue = async () => {
+      if (!selectedLevel) return;
+      setIsLoading(true);
+  
+      // getting currently logged user to update their profile with the selected knowledge_level
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ knowledge_level: selectedLevel })
+          .eq('id', user.id);
+  
+        if (error) {
+          Alert.alert('Error saving knowledge_level', error.message);
+          setIsLoading(false);
+          return;
+        }
+      }
+      // if successfully updated, navigate to the next onboarding screen
+      setIsLoading(false);
+      router.push('/onboarding/features' as any);
+    };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -61,10 +87,14 @@ export default function KnowledgeScreen() {
         <TouchableOpacity
           style={[styles.continueButton, !selectedLevel && styles.continueButtonDisabled]}
           activeOpacity={0.8}
-          onPress={() => router.push('/onboarding/features' as any)}
-          disabled={!selectedLevel}
+          onPress={handleContinue}
+          disabled={!selectedLevel || isLoading}
         >
+          {isLoading ? (
+            <ActivityIndicator color={Colors.background} />
+            ) : (
           <Text style={styles.continueButtonText}>Continue</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -1,3 +1,6 @@
+import { Alert, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
+
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -15,12 +18,47 @@ import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme
 import { Ionicons } from '@expo/vector-icons';
 
 export default function NameScreen() {
+  const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const isValid = name.trim().length > 0 && email.trim().length > 0 && password.length >= 6;
+
+const handleSignup = async () => {
+    if (!isValid) return;
+    setIsLoading(true);
+
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password: password,
+      options: {
+        data: { display_name: name.trim() }, 
+      },
+    });
+
+    if (error) {
+      console.error('Signup error:', error);
+    }
+
+    // logging in automatically after signup to ensure we have a valid session
+    if (!data.session) {
+      const { error: loginError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (loginError) {
+        Alert.alert('Auto-login Failed', loginError.message);
+        setIsLoading(false);
+        return;
+      }
+    }
+
+    setIsLoading(false);
+    router.push('/onboarding/currency' as any);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,10 +145,14 @@ export default function NameScreen() {
           <TouchableOpacity
             style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
             activeOpacity={0.8}
-            onPress={() => router.push('/onboarding/currency' as any)}
-            disabled={!isValid}
+            onPress={handleSignup}
+            disabled={!isValid || isLoading}
           >
-            <Text style={styles.continueButtonText}>Continue</Text>
+            {isLoading ? (
+              <ActivityIndicator color={Colors.background} />
+            ) : (
+              <Text style={styles.continueButtonText}>Continue</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
