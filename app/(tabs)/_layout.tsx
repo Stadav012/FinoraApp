@@ -32,6 +32,7 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           if (route.name === 'index') iconName = isFocused ? 'home' : 'home-outline';
           if (route.name === 'analytics') iconName = isFocused ? 'bar-chart' : 'bar-chart-outline';
           if (route.name === 'goals') iconName = isFocused ? 'flag' : 'flag-outline';
+          if (route.name === 'subscriptions') iconName = isFocused ? 'card' : 'card-outline';
           if (route.name === 'settings') iconName = isFocused ? 'settings' : 'settings-outline';
 
           return (
@@ -68,6 +69,7 @@ export default function TabLayout() {
       <Tabs.Screen name="index" options={{ title: 'Dashboard' }} />
       <Tabs.Screen name="analytics" options={{ title: 'Analytics' }} />
       <Tabs.Screen name="goals" options={{ title: 'Goals' }} />
+      <Tabs.Screen name="subscriptions" options={{ title: 'Subs' }} />
       <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
     </Tabs>
   );
@@ -87,7 +89,7 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     backgroundColor: Colors.surfaceElevated,
-    width: width * 0.85,
+    width: width * 0.92,
     height: 64,
     borderRadius: BorderRadius.pill,
     alignItems: 'center',
