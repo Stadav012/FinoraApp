@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TextInput,
   TouchableOpacity, Dimensions, Image, Animated, Easing,
-  ActivityIndicator, Alert, RefreshControl,
+  ActivityIndicator, Alert, RefreshControl, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
@@ -184,6 +184,10 @@ export default function DashboardScreen() {
 
   const shimmerTranslate = shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-CARD_WIDTH, CARD_WIDTH] });
 
+  // ScrollView ref for auto-scrolling to input
+  const scrollRef = useRef<ScrollView>(null);
+  const inputLayoutY = useRef(0);
+
   // ── Loading state ──
   if (isLoading) {
     return (
@@ -198,10 +202,17 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.finoraGreen} />}
       >
         {/* Header */}
@@ -307,7 +318,10 @@ export default function DashboardScreen() {
             </Animated.View>
           )}
 
-          <View style={styles.inputRow}>
+          <View
+            style={styles.inputRow}
+            onLayout={(e) => { inputLayoutY.current = e.nativeEvent.layout.y; }}
+          >
             <TextInput
               style={styles.chatInput}
               placeholder={'e.g. "Spent $15 on coffee"'}
@@ -317,6 +331,12 @@ export default function DashboardScreen() {
               editable={chatState === 'idle'}
               onSubmitEditing={handleSend}
               returnKeyType="send"
+              onFocus={() => {
+                // Auto-scroll to keep input visible above keyboard
+                setTimeout(() => {
+                  scrollRef.current?.scrollToEnd({ animated: true });
+                }, 300);
+              }}
             />
             <TouchableOpacity
               style={[styles.sendBtn, logText.trim().length > 0 && chatState === 'idle' && styles.sendBtnActive]}
@@ -354,6 +374,7 @@ export default function DashboardScreen() {
         </View>
         <View style={{ height: 100 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
