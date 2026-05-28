@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   getFullProfile, getUserEmail, updateProfile, updatePassword,
   signOut, deleteAccount,
@@ -30,6 +31,7 @@ function SettingsRow({
   icon: string; label: string; value?: string; onPress?: () => void;
   isDestructive?: boolean; showChevron?: boolean; rightElement?: React.ReactNode;
 }) {
+  const { colors } = useTheme();
   return (
     <TouchableOpacity
       style={styles.row}
@@ -37,20 +39,20 @@ function SettingsRow({
       onPress={onPress}
       disabled={!onPress}
     >
-      <View style={[styles.rowIconWrap, isDestructive && { backgroundColor: '#ff6b6b15' }]}>
+      <View style={[styles.rowIconWrap, { backgroundColor: isDestructive ? '#ff6b6b15' : colors.background }, isDestructive && { backgroundColor: '#ff6b6b15' }]}>
         <Ionicons
           name={icon as any}
           size={20}
-          color={isDestructive ? '#ff6b6b' : Colors.textSecondary}
+          color={isDestructive ? '#ff6b6b' : colors.textSecondary}
         />
       </View>
       <View style={styles.rowContent}>
-        <Text style={[styles.rowLabel, isDestructive && { color: '#ff6b6b' }]}>{label}</Text>
-        {value ? <Text style={styles.rowValue}>{value}</Text> : null}
+        <Text style={[styles.rowLabel, { color: colors.text }, isDestructive && { color: '#ff6b6b' }]}>{label}</Text>
+        {value ? <Text style={[styles.rowValue, { color: colors.textTertiary }]}>{value}</Text> : null}
       </View>
       {rightElement ?? null}
       {showChevron && onPress && !rightElement && (
-        <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       )}
     </TouchableOpacity>
   );
@@ -291,10 +293,20 @@ export default function SettingsScreen() {
     );
   };
 
+  const { colors, themeMode, setThemeMode } = useTheme();
+
+  const cycleTheme = () => {
+    const modes = ['light', 'dark', 'system'] as const;
+    const idx = modes.indexOf(themeMode);
+    setThemeMode(modes[(idx + 1) % modes.length]);
+  };
+
+  const themeModeLabel = themeMode === 'system' ? 'System' : themeMode === 'dark' ? 'Dark' : 'Light';
+
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.finoraGreen} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.finoraGreen} />
       </SafeAreaView>
     );
   }
@@ -306,7 +318,7 @@ export default function SettingsScreen() {
   const currencyLabel = CURRENCIES.find(c => c.id === profile?.currency)?.name ?? profile?.currency ?? 'USD';
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       {/* Modals */}
       <EditNameModal
         visible={showNameModal}
@@ -328,31 +340,31 @@ export default function SettingsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Header */}
-        <Text style={styles.pageTitle}>Settings</Text>
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Settings</Text>
 
         {/* Profile Card */}
-        <View style={styles.profileCard}>
+        <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
           <View style={styles.profileAvatarWrap}>
             <Image source={require('../../assets/finora-icon.png')} style={styles.profileAvatar} resizeMode="cover" />
           </View>
           <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{profile?.display_name ?? 'User'}</Text>
-            <Text style={styles.profileEmail}>{email}</Text>
-            <Text style={styles.profileMember}>Member since {memberSince}</Text>
+            <Text style={[styles.profileName, { color: colors.text }]}>{profile?.display_name ?? 'User'}</Text>
+            <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>{email}</Text>
+            <Text style={[styles.profileMember, { color: colors.textTertiary }]}>Member since {memberSince}</Text>
           </View>
         </View>
 
         {/* Saving indicator */}
         {isSaving && (
           <View style={styles.savingBar}>
-            <ActivityIndicator size="small" color={Colors.finoraGreen} />
+            <ActivityIndicator size="small" color={colors.finoraGreen} />
             <Text style={styles.savingText}>Saving...</Text>
           </View>
         )}
 
         {/* Account Section */}
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.sectionCard}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
           <SettingsRow icon="person-outline" label="Display Name" value={profile?.display_name} onPress={() => setShowNameModal(true)} />
           <View style={styles.separator} />
           <SettingsRow icon="mail-outline" label="Email" value={email} />
@@ -361,10 +373,12 @@ export default function SettingsScreen() {
         </View>
 
         {/* Preferences Section */}
-        <Text style={styles.sectionTitle}>Preferences</Text>
-        <View style={styles.sectionCard}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Preferences</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
           <SettingsRow icon="cash-outline" label="Default Currency" value={currencyLabel} onPress={() => setShowCurrencyModal(true)} />
-          <View style={styles.separator} />
+          <View style={[styles.separator, { backgroundColor: colors.borderSubtle }]} />
+          <SettingsRow icon="moon-outline" label="Appearance" value={themeModeLabel} onPress={cycleTheme} />
+          <View style={[styles.separator, { backgroundColor: colors.borderSubtle }]} />
           <SettingsRow
             icon="cloud-outline"
             label="Auto Backup"
@@ -373,28 +387,28 @@ export default function SettingsScreen() {
               <Switch
                 value={profile?.auto_backup ?? true}
                 onValueChange={handleToggleBackup}
-                trackColor={{ false: Colors.border, true: Colors.finoraGreen + '50' }}
-                thumbColor={profile?.auto_backup ? Colors.finoraGreen : Colors.textTertiary}
+                trackColor={{ false: colors.border, true: colors.finoraGreen + '50' }}
+                thumbColor={profile?.auto_backup ? colors.finoraGreen : colors.textTertiary}
               />
             }
           />
         </View>
 
         {/* About Section */}
-        <Text style={styles.sectionTitle}>About</Text>
-        <View style={styles.sectionCard}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>About</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
           <SettingsRow icon="information-circle-outline" label="Version" value="1.0.0" showChevron={false} />
-          <View style={styles.separator} />
+          <View style={[styles.separator, { backgroundColor: colors.borderSubtle }]} />
           <SettingsRow icon="document-text-outline" label="Terms of Service" onPress={() => {}} />
-          <View style={styles.separator} />
+          <View style={[styles.separator, { backgroundColor: colors.borderSubtle }]} />
           <SettingsRow icon="shield-checkmark-outline" label="Privacy Policy" onPress={() => {}} />
         </View>
 
         {/* Danger Zone */}
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
-        <View style={styles.sectionCard}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Danger Zone</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
           <SettingsRow icon="log-out-outline" label="Sign Out" onPress={handleSignOut} isDestructive />
-          <View style={styles.separator} />
+          <View style={[styles.separator, { backgroundColor: colors.borderSubtle }]} />
           <SettingsRow icon="trash-outline" label="Delete Account" onPress={handleDeleteAccount} isDestructive />
         </View>
 

@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardAwareModal from '../../components/KeyboardAwareModal';
+import { sharedModalStyles as ms } from '../../components/sharedModalStyles';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   getGoals, createGoal, addToGoal, deleteGoal, type Goal,
 } from '../../lib/services/goalsService';
@@ -317,98 +319,103 @@ export default function GoalsScreen() {
   const overallProgress = totalTarget > 0 ? totalSaved / totalTarget : 0;
   const completedCount = goals.filter(g => g.is_completed).length;
 
+  const { colors } = useTheme();
+
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.finoraGreen} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.finoraGreen} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      {/* ── Create Modal ── */}
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
+      {/* ── Create Goal Modal ── */}
       <KeyboardAwareModal visible={showCreate} onClose={() => setShowCreate(false)}>
-        <Text style={modalS.title}>New Goal</Text>
+        <Text style={[ms.title, { color: colors.text }]}>New Goal</Text>
+        <Text style={[ms.subtitle, { color: colors.textSecondary }]}>Set a target and track your progress</Text>
+
         <TextInput
-          style={modalS.input}
+          style={[ms.input, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.surface }]}
           placeholder="Goal name (e.g. Vacation)"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={newName}
           onChangeText={setNewName}
           autoFocus
         />
         <TextInput
-          style={[modalS.input, { marginTop: Spacing.md }]}
+          style={[ms.input, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.surface }]}
           placeholder="Target amount"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={newAmount}
           onChangeText={setNewAmount}
           keyboardType="decimal-pad"
         />
-        {/* Icon picker */}
-        <Text style={modalS.label}>Icon</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.md }}>
+
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Icon</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ms.iconRow}>
           {GOAL_ICONS.map(ic => (
             <TouchableOpacity
               key={ic.id}
-              style={[modalS.iconBtn, newIcon === ic.id && { backgroundColor: newColor + '20', borderColor: newColor }]}
+              style={[ms.iconBtn, newIcon === ic.id && { ...ms.iconBtnSelected, backgroundColor: newColor + '15', borderColor: newColor }]}
               onPress={() => setNewIcon(ic.id)}
             >
-              <Ionicons name={ic.id as any} size={20} color={newIcon === ic.id ? newColor : Colors.textSecondary} />
+              <Ionicons name={ic.id as any} size={20} color={newIcon === ic.id ? newColor : colors.textSecondary} />
             </TouchableOpacity>
           ))}
         </ScrollView>
-        {/* Color picker */}
-        <Text style={modalS.label}>Color</Text>
-        <View style={modalS.colorRow}>
+
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Color</Text>
+        <View style={ms.colorRow}>
           {GOAL_COLORS.map(c => (
             <TouchableOpacity
               key={c}
-              style={[modalS.colorDot, { backgroundColor: c }, newColor === c && modalS.colorDotSelected]}
+              style={[ms.colorDot, { backgroundColor: c }, newColor === c && ms.colorDotSelected]}
               onPress={() => setNewColor(c)}
             />
           ))}
         </View>
-        <View style={modalS.actions}>
-          <TouchableOpacity style={modalS.cancelBtn} onPress={() => setShowCreate(false)}>
-            <Text style={modalS.cancelText}>Cancel</Text>
+
+        <View style={ms.actions}>
+          <TouchableOpacity style={ms.cancelBtn} onPress={() => setShowCreate(false)}>
+            <Text style={ms.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[modalS.saveBtn, { backgroundColor: newColor }, (!newName.trim() || !newAmount) && { opacity: 0.4 }]}
+            style={[ms.saveBtn, { backgroundColor: newColor, shadowColor: newColor }, (!newName.trim() || !newAmount) && ms.saveBtnDisabled]}
             onPress={handleCreate}
             disabled={!newName.trim() || !newAmount}
           >
-            <Text style={modalS.saveText}>Create</Text>
+            <Text style={ms.saveText}>Create Goal</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAwareModal>
 
       {/* ── Add Funds Modal ── */}
       <KeyboardAwareModal visible={showAddFunds} onClose={() => setShowAddFunds(false)}>
-        <Text style={modalS.title}>Add to {selectedGoal?.name}</Text>
-        <Text style={{ color: Colors.textSecondary, marginBottom: Spacing.lg }}>
+        <Text style={[ms.title, { color: colors.text }]}>Add to {selectedGoal?.name}</Text>
+        <Text style={[ms.subtitle, { color: colors.textSecondary }]}>
           {fmt(Number(selectedGoal?.current_amount ?? 0))} saved of {fmt(Number(selectedGoal?.target_amount ?? 0))}
         </Text>
         <TextInput
-          style={modalS.input}
+          style={[ms.input, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.surface }]}
           placeholder="Amount to add"
-          placeholderTextColor={Colors.textTertiary}
+          placeholderTextColor={colors.textTertiary}
           value={fundAmount}
           onChangeText={setFundAmount}
           keyboardType="decimal-pad"
           autoFocus
         />
-        <View style={modalS.actions}>
-          <TouchableOpacity style={modalS.cancelBtn} onPress={() => setShowAddFunds(false)}>
-            <Text style={modalS.cancelText}>Cancel</Text>
+        <View style={ms.actions}>
+          <TouchableOpacity style={ms.cancelBtn} onPress={() => setShowAddFunds(false)}>
+            <Text style={ms.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[modalS.saveBtn, { backgroundColor: selectedGoal?.color ?? Colors.finoraGreen }, !fundAmount && { opacity: 0.4 }]}
+            style={[ms.saveBtn, { backgroundColor: selectedGoal?.color ?? Colors.finoraGreen, shadowColor: selectedGoal?.color ?? Colors.finoraGreen }, !fundAmount && ms.saveBtnDisabled]}
             onPress={handleAddFunds}
             disabled={!fundAmount}
           >
-            <Text style={modalS.saveText}>Add Funds</Text>
+            <Text style={ms.saveText}>Add Funds</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAwareModal>
@@ -416,20 +423,20 @@ export default function GoalsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.finoraGreen} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.finoraGreen} />}
       >
-        <Text style={styles.pageTitle}>Goals</Text>
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Goals</Text>
 
         {/* ── Hero Ring ── */}
         <Animated.View style={[styles.heroSection, { opacity: heroOpacity, transform: [{ scale: heroScale }] }]}>
-          <ProgressRing progress={overallProgress} size={RING_SIZE} strokeWidth={RING_STROKE} color={Colors.finoraGreen}>
-            <Text style={styles.heroPercent}>{Math.round(overallProgress * 100)}%</Text>
-            <Text style={styles.heroLabel}>overall</Text>
+          <ProgressRing progress={overallProgress} size={RING_SIZE} strokeWidth={RING_STROKE} color={colors.finoraGreen}>
+            <Text style={[styles.heroPercent, { color: colors.text }]}>{Math.round(overallProgress * 100)}%</Text>
+            <Text style={[styles.heroLabel, { color: colors.textSecondary }]}>overall</Text>
           </ProgressRing>
-          <View style={styles.heroStats}>
+          <View style={[styles.heroStats, { backgroundColor: colors.surface }]}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatNum}>{goals.length}</Text>
-              <Text style={styles.heroStatLabel}>Active</Text>
+              <Text style={[styles.heroStatNum, { color: colors.text }]}>{goals.length}</Text>
+              <Text style={[styles.heroStatLabel, { color: colors.textSecondary }]}>Active</Text>
             </View>
             <View style={styles.heroStatDiv} />
             <View style={styles.heroStat}>
@@ -627,26 +634,3 @@ const gcStyles = StyleSheet.create({
   },
 });
 
-const modalS = StyleSheet.create({
-  title: { fontSize: Typography.sizes.headingSm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.xl },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md },
-  input: {
-    fontSize: Typography.sizes.body, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.base, paddingVertical: 14, backgroundColor: Colors.surface,
-  },
-  iconBtn: {
-    width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
-  },
-  colorRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
-  colorDot: { width: 32, height: 32, borderRadius: 16 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.md, marginTop: Spacing.xl },
-  cancelBtn: {
-    paddingVertical: 12, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.pill,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  cancelText: { fontSize: Typography.sizes.body, fontWeight: '500', color: Colors.text },
-  saveBtn: { paddingVertical: 12, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.pill },
-  saveText: { fontSize: Typography.sizes.body, fontWeight: '600', color: '#fff' },
-});

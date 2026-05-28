@@ -7,6 +7,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   getProfile, getAccounts, getMonthSummary, getRecentTransactions,
   logTransaction, currencyFormatter,
@@ -188,11 +189,13 @@ export default function DashboardScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const inputLayoutY = useRef(0);
 
+  const { colors } = useTheme();
+
   // ── Loading state ──
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.finoraGreen} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.finoraGreen} />
       </SafeAreaView>
     );
   }
@@ -201,7 +204,7 @@ export default function DashboardScreen() {
   const cardholderName = displayName.toUpperCase().split(' ')[0] + (displayName.split(' ')[1] ? ` ${displayName.split(' ')[1][0]}.` : '');
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -213,13 +216,13 @@ export default function DashboardScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.finoraGreen} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.finoraGreen} />}
       >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>{getGreeting()}</Text>
-            <Text style={styles.headerName}>{displayName}</Text>
+            <Text style={[styles.greeting, { color: colors.textSecondary }]}>{getGreeting()}</Text>
+            <Text style={[styles.headerName, { color: colors.text }]}>{displayName}</Text>
           </View>
           <TouchableOpacity style={styles.avatarWrap}>
             <Image source={require('../../assets/finora-icon.png')} style={styles.avatarImg} resizeMode="cover" />
@@ -258,20 +261,20 @@ export default function DashboardScreen() {
         </View>
 
         {/* Balance Row */}
-        <View style={styles.balRow}>
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraGreen }]} /><View><Text style={styles.balLabel}>Income</Text><Text style={styles.balVal}>{fmt(summary.income)}</Text></View></View>
-          <View style={styles.balDiv} />
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: '#ff6b6b' }]} /><View><Text style={styles.balLabel}>Spent</Text><Text style={styles.balVal}>{fmt(summary.expense)}</Text></View></View>
-          <View style={styles.balDiv} />
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraSkyBlue }]} /><View><Text style={styles.balLabel}>Balance</Text><Text style={[styles.balVal, { fontWeight: '800' }]}>{fmt(totalBalance)}</Text></View></View>
+        <View style={[styles.balRow, { backgroundColor: colors.surface }]}>
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: colors.finoraGreen }]} /><View><Text style={[styles.balLabel, { color: colors.textSecondary }]}>Income</Text><Text style={[styles.balVal, { color: colors.text }]}>{fmt(summary.income)}</Text></View></View>
+          <View style={[styles.balDiv, { backgroundColor: colors.border }]} />
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: '#ff6b6b' }]} /><View><Text style={[styles.balLabel, { color: colors.textSecondary }]}>Spent</Text><Text style={[styles.balVal, { color: colors.text }]}>{fmt(summary.expense)}</Text></View></View>
+          <View style={[styles.balDiv, { backgroundColor: colors.border }]} />
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: colors.finoraSkyBlue }]} /><View><Text style={[styles.balLabel, { color: colors.textSecondary }]}>Balance</Text><Text style={[styles.balVal, { fontWeight: '800', color: colors.text }]}>{fmt(totalBalance)}</Text></View></View>
         </View>
 
         {/* ══ AI Chat Section ══ */}
         <View style={styles.chatSection}>
           {chatState === 'idle' && (
             <View style={styles.aiBubble}>
-              <Ionicons name="sparkles" size={16} color={Colors.finoraGreen} style={{ marginRight: 6 }} />
-              <Text style={styles.aiBubbleText}>What did you spend on today?</Text>
+              <Ionicons name="sparkles" size={16} color={colors.finoraGreen} style={{ marginRight: 6 }} />
+              <Text style={[styles.aiBubbleText, { color: colors.textSecondary }]}>What did you spend on today?</Text>
             </View>
           )}
 
@@ -294,7 +297,7 @@ export default function DashboardScreen() {
             <Animated.View style={[styles.resultCard, { opacity: cardAnim, transform: [{ scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
               <View style={styles.resultTop}>
                 <View style={styles.resultIconWrap}>
-                  <Ionicons name={lastResult.icon as any} size={22} color={Colors.finoraGreen} />
+                  <Ionicons name={lastResult.icon as any} size={22} color={colors.finoraGreen} />
                 </View>
                 <View style={styles.resultInfo}>
                   <Text style={styles.resultTitle}>{lastResult.description}</Text>
@@ -325,7 +328,7 @@ export default function DashboardScreen() {
             <TextInput
               style={styles.chatInput}
               placeholder={'e.g. "Spent $15 on coffee"'}
-              placeholderTextColor={Colors.textTertiary}
+              placeholderTextColor={colors.textTertiary}
               value={logText}
               onChangeText={setLogText}
               editable={chatState === 'idle'}
@@ -343,7 +346,7 @@ export default function DashboardScreen() {
               disabled={logText.trim().length === 0 || chatState !== 'idle'}
               onPress={handleSend}
             >
-              <Ionicons name="send" size={18} color={logText.trim().length > 0 && chatState === 'idle' ? '#fff' : Colors.textTertiary} />
+              <Ionicons name="send" size={18} color={logText.trim().length > 0 && chatState === 'idle' ? '#fff' : colors.textTertiary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -351,22 +354,22 @@ export default function DashboardScreen() {
         {/* ── Recent Activity ── */}
         <View style={styles.actSection}>
           <View style={styles.actHeader}>
-            <Text style={styles.actTitle}>Recent Activity</Text>
+            <Text style={[styles.actTitle, { color: colors.text }]}>Recent Activity</Text>
             <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
           </View>
           {transactions.length === 0 && (
-            <Text style={{ color: Colors.textTertiary, textAlign: 'center', paddingVertical: Spacing.xl }}>
+            <Text style={{ color: colors.textTertiary, textAlign: 'center', paddingVertical: Spacing.xl }}>
               No transactions yet. Use the chat above to log your first one!
             </Text>
           )}
           {transactions.map(tx => (
             <View key={tx.id} style={styles.txRow}>
-              <View style={styles.txIcon}><Ionicons name={txIcon(tx) as any} size={20} color={Colors.textSecondary} /></View>
+              <View style={styles.txIcon}><Ionicons name={txIcon(tx) as any} size={20} color={colors.textSecondary} /></View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.txTitle}>{tx.description}</Text>
-                <Text style={styles.txDate}>{formatDate(tx.transaction_date)}</Text>
+                <Text style={[styles.txTitle, { color: colors.text }]}>{tx.description}</Text>
+                <Text style={[styles.txDate, { color: colors.textSecondary }]}>{formatDate(tx.transaction_date)}</Text>
               </View>
-              <Text style={[styles.txAmt, tx.type === 'income' && { color: Colors.finoraGreenDark }]}>
+              <Text style={[styles.txAmt, tx.type === 'income' && { color: colors.finoraGreenDark }]}>
                 {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
               </Text>
             </View>

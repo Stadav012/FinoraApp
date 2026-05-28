@@ -7,8 +7,13 @@ import {
   Keyboard,
   StyleSheet,
   View,
+  ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Colors, BorderRadius, Spacing } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface KeyboardAwareModalProps {
   visible: boolean;
@@ -17,11 +22,11 @@ interface KeyboardAwareModalProps {
 }
 
 /**
- * A bottom-sheet modal that properly avoids the keyboard on both iOS and Android.
- * Wraps children in a KeyboardAvoidingView so inputs are never hidden behind the keyboard.
- * Tap the backdrop to dismiss.
+ * Premium bottom-sheet modal with handle bar, frosted backdrop,
+ * and proper keyboard avoidance on both platforms.
  */
 export default function KeyboardAwareModal({ visible, onClose, children }: KeyboardAwareModalProps) {
+  const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -34,8 +39,22 @@ export default function KeyboardAwareModal({ visible, onClose, children }: Keybo
         keyboardVerticalOffset={0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={styles.sheet}>
-            {children}
+          <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+            {/* Handle bar */}
+            <View style={styles.handleRow}>
+              <View style={styles.handle} />
+            </View>
+
+            {/* Content with scroll for long forms */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              style={styles.scrollContent}
+              contentContainerStyle={styles.scrollInner}
+            >
+              {children}
+            </ScrollView>
           </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
@@ -46,7 +65,7 @@ export default function KeyboardAwareModal({ visible, onClose, children }: Keybo
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
   },
   keyboardView: {
     position: 'absolute',
@@ -56,9 +75,33 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.background,
-    borderTopLeftRadius: BorderRadius['3xl'],
-    borderTopRightRadius: BorderRadius['3xl'],
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    maxHeight: SCREEN_HEIGHT * 0.88,
+    // Top shadow for depth
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  handleRow: {
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.border,
+  },
+  scrollContent: {
+    flexGrow: 0,
+  },
+  scrollInner: {
     padding: Spacing.xl,
+    paddingTop: Spacing.lg,
     paddingBottom: Spacing['4xl'],
   },
 });

@@ -8,6 +8,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardAwareModal from '../../components/KeyboardAwareModal';
+import { sharedModalStyles as ms } from '../../components/sharedModalStyles';
+import { useTheme } from '../../contexts/ThemeContext';
 import {
   getSubscriptions, createSubscription, deleteSubscription,
   getMonthlyTotal, getUpcoming,
@@ -204,91 +206,91 @@ export default function SubscriptionsScreen() {
   const upcoming = getUpcoming(subs, 7);
   const yearlyEstimate = monthlyTotal * 12;
 
+  const { colors } = useTheme();
+
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={Colors.finoraGreen} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.finoraGreen} />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top', 'left', 'right']}>
       {/* Create Modal */}
       <KeyboardAwareModal visible={showCreate} onClose={() => setShowCreate(false)}>
-        <Text style={modalS.title}>Add Subscription</Text>
+        <Text style={[ms.title, { color: colors.text }]}>Add Subscription</Text>
+        <Text style={[ms.subtitle, { color: colors.textSecondary }]}>Track a recurring payment</Text>
+
         <TextInput
-          style={modalS.input} placeholder="Name (e.g. Netflix)"
-          placeholderTextColor={Colors.textTertiary} value={name} onChangeText={setName} autoFocus
+          style={[ms.input, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.surface }]} placeholder="Name (e.g. Netflix)"
+          placeholderTextColor={colors.textTertiary} value={name} onChangeText={setName} autoFocus
         />
         <TextInput
-          style={[modalS.input, { marginTop: Spacing.md }]} placeholder="Amount"
-          placeholderTextColor={Colors.textTertiary} value={amount} onChangeText={setAmount} keyboardType="decimal-pad"
+          style={[ms.input, { color: colors.text, borderColor: colors.borderSubtle, backgroundColor: colors.surface }]} placeholder="Amount"
+          placeholderTextColor={colors.textTertiary} value={amount} onChangeText={setAmount} keyboardType="decimal-pad"
         />
 
-        {/* Billing cycle */}
-        <Text style={modalS.label}>Billing Cycle</Text>
-        <View style={modalS.chipRow}>
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Billing Cycle</Text>
+        <View style={ms.chipRow}>
           {CYCLES.map(c => (
             <TouchableOpacity
               key={c.id}
-              style={[modalS.chip, cycle === c.id && { backgroundColor: Colors.finoraGreen, borderColor: Colors.finoraGreen }]}
+              style={[ms.chip, cycle === c.id && ms.chipSelected]}
               onPress={() => setCycle(c.id)}
             >
-              <Text style={[modalS.chipText, cycle === c.id && { color: '#fff' }]}>{c.label}</Text>
+              <Text style={[ms.chipText, cycle === c.id && ms.chipTextSelected]}>{c.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Reminder */}
-        <Text style={modalS.label}>Remind Me</Text>
-        <View style={modalS.chipRow}>
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Remind Me</Text>
+        <View style={ms.chipRow}>
           {REMIND_OPTIONS.map(r => (
             <TouchableOpacity
               key={r.days}
-              style={[modalS.chip, remind === r.days && { backgroundColor: Colors.finoraSkyBlue, borderColor: Colors.finoraSkyBlue }]}
+              style={[ms.chip, remind === r.days && { ...ms.chipSelected, borderColor: colors.finoraSkyBlue, backgroundColor: colors.finoraSkyBlue + '12' }]}
               onPress={() => setRemind(r.days)}
             >
-              <Text style={[modalS.chipText, remind === r.days && { color: '#fff' }]}>{r.label}</Text>
+              <Text style={[ms.chipText, remind === r.days && { color: colors.finoraSkyBlue }]}>{r.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Icon picker */}
-        <Text style={modalS.label}>Icon</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.sm }}>
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Icon</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={ms.iconRow}>
           {SUB_ICONS.map(ic => (
             <TouchableOpacity
               key={ic.id}
-              style={[modalS.iconBtn, icon === ic.id && { backgroundColor: color + '20', borderColor: color }]}
+              style={[ms.iconBtn, icon === ic.id && { ...ms.iconBtnSelected, backgroundColor: color + '15', borderColor: color }]}
               onPress={() => setIcon(ic.id)}
             >
-              <Ionicons name={ic.id as any} size={20} color={icon === ic.id ? color : Colors.textSecondary} />
+              <Ionicons name={ic.id as any} size={20} color={icon === ic.id ? color : colors.textSecondary} />
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* Color picker */}
-        <Text style={modalS.label}>Color</Text>
-        <View style={modalS.colorRow}>
+        <Text style={[ms.sectionLabel, { color: colors.textSecondary }]}>Color</Text>
+        <View style={ms.colorRow}>
           {SUB_COLORS.map(c => (
             <TouchableOpacity
               key={c}
-              style={[modalS.colorDot, { backgroundColor: c }, color === c && modalS.colorDotSelected]}
+              style={[ms.colorDot, { backgroundColor: c }, color === c && ms.colorDotSelected]}
               onPress={() => setColor(c)}
             />
           ))}
         </View>
 
-        <View style={modalS.actions}>
-          <TouchableOpacity style={modalS.cancelBtn} onPress={() => setShowCreate(false)}>
-            <Text style={modalS.cancelText}>Cancel</Text>
+        <View style={ms.actions}>
+          <TouchableOpacity style={ms.cancelBtn} onPress={() => setShowCreate(false)}>
+            <Text style={ms.cancelText}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[modalS.saveBtn, { backgroundColor: color }, (!name.trim() || !amount) && { opacity: 0.4 }]}
+            style={[ms.saveBtn, { backgroundColor: color, shadowColor: color }, (!name.trim() || !amount) && ms.saveBtnDisabled]}
             onPress={handleCreate} disabled={!name.trim() || !amount}
           >
-            <Text style={modalS.saveText}>Add</Text>
+            <Text style={ms.saveText}>Add Subscription</Text>
           </TouchableOpacity>
         </View>
       </KeyboardAwareModal>
@@ -296,9 +298,9 @@ export default function SubscriptionsScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.finoraGreen} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.finoraGreen} />}
       >
-        <Text style={styles.pageTitle}>Subscriptions</Text>
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Subscriptions</Text>
 
         {/* ── Hero Summary Card ── */}
         <Animated.View style={[styles.heroCard, { opacity: heroOpacity, transform: [{ scale: heroScale }] }]}>
@@ -456,33 +458,3 @@ const scStyles = StyleSheet.create({
   },
 });
 
-// ── Modal Styles ──
-const modalS = StyleSheet.create({
-  title: { fontSize: Typography.sizes.headingSm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.xl },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, marginBottom: Spacing.sm, marginTop: Spacing.md },
-  input: {
-    fontSize: Typography.sizes.body, color: Colors.text, borderWidth: 1, borderColor: Colors.border,
-    borderRadius: BorderRadius.lg, paddingHorizontal: Spacing.base, paddingVertical: 14, backgroundColor: Colors.surface,
-  },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm },
-  chip: {
-    paddingVertical: 8, paddingHorizontal: 14, borderRadius: BorderRadius.pill,
-    borderWidth: 1.5, borderColor: Colors.border,
-  },
-  chipText: { fontSize: 13, fontWeight: '600', color: Colors.text },
-  iconBtn: {
-    width: 44, height: 44, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center', marginRight: Spacing.sm,
-  },
-  colorRow: { flexDirection: 'row', gap: Spacing.md, marginBottom: Spacing.md },
-  colorDot: { width: 32, height: 32, borderRadius: 16 },
-  colorDotSelected: { borderWidth: 3, borderColor: Colors.text },
-  actions: { flexDirection: 'row', justifyContent: 'flex-end', gap: Spacing.md, marginTop: Spacing.xl },
-  cancelBtn: {
-    paddingVertical: 12, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.pill,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  cancelText: { fontSize: Typography.sizes.body, fontWeight: '500', color: Colors.text },
-  saveBtn: { paddingVertical: 12, paddingHorizontal: Spacing.xl, borderRadius: BorderRadius.pill },
-  saveText: { fontSize: Typography.sizes.body, fontWeight: '600', color: '#fff' },
-});

@@ -10,6 +10,7 @@ import { router } from 'expo-router';
 import { Colors } from '../constants/theme';
 import { StatusBar } from 'expo-status-bar';
 import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const ICON_SIZE = width * 0.35;
@@ -57,9 +58,11 @@ export default function SplashScreen() {
     checkSession();
   }, []);
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-      <StatusBar style="dark" />
+    <Animated.View style={[styles.container, { opacity: screenOpacity, backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Animated.View
         style={[
           styles.iconWrapper,

@@ -4,13 +4,15 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Spacing, BorderRadius } from '../../constants/theme';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
 function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { colors } = useTheme();
   return (
     <View style={styles.tabBarContainer}>
-      <View style={styles.tabBar}>
+      <View style={[styles.tabBar, { backgroundColor: colors.surfaceElevated }]}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const isFocused = state.index === index;
@@ -44,11 +46,11 @@ function FloatingTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               style={styles.tabItem}
               activeOpacity={0.7}
             >
-              <View style={[styles.iconWrapper, isFocused && styles.iconWrapperFocused]}>
+              <View style={[styles.iconWrapper, isFocused && { backgroundColor: colors.finoraGreen + '1A' }]}>
                 <Ionicons
                   name={iconName}
                   size={24}
-                  color={isFocused ? Colors.finoraGreen : Colors.textTertiary}
+                  color={isFocused ? colors.finoraGreen : colors.textTertiary}
                 />
               </View>
             </TouchableOpacity>
