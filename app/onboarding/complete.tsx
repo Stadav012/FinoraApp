@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import { seedDefaultAccount, getProfile } from '../../lib/services/dashboardService';
 
 const { width } = Dimensions.get('window');
 
@@ -45,6 +46,17 @@ export default function CompleteScreen() {
   const screenOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    // Seed the user's default Cash account in the background
+    // This is idempotent — safe to call multiple times
+    (async () => {
+      try {
+        const profile = await getProfile();
+        await seedDefaultAccount(profile.currency);
+      } catch (e) {
+        console.warn('Account seed skipped:', e);
+      }
+    })();
+
     // Stage 1: Logo animates in
     Animated.parallel([
       Animated.spring(logoScale, {

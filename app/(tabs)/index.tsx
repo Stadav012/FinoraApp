@@ -1,42 +1,52 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView, TextInput,
   TouchableOpacity, Dimensions, Image, Animated, Easing,
+  ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors, Typography, Spacing, BorderRadius } from '../../constants/theme';
 import { Ionicons } from '@expo/vector-icons';
+import {
+  getProfile, getAccounts, getMonthSummary, getRecentTransactions,
+  logTransaction, currencyFormatter,
+  type UserProfile, type Account, type MonthSummary, type Transaction,
+} from '../../lib/services/dashboardService';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width - Spacing.xl * 2;
 const CARD_HEIGHT = CARD_WIDTH * 0.6;
 
-interface LoggedTx {
-  id: string; title: string; amount: string; category: string; icon: string;
+// ── Map category/description to an icon ──
+function txIcon(tx: Transaction): string {
+  const d = (tx.description + ' ' + (tx.category?.name ?? '')).toLowerCase();
+  if (d.includes('coffee') || d.includes('cafe')) return 'cafe';
+  if (d.includes('food') || d.includes('restaurant') || d.includes('lunch') || d.includes('dinner')) return 'restaurant';
+  if (d.includes('uber') || d.includes('transport') || d.includes('gas') || d.includes('lyft')) return 'car';
+  if (d.includes('grocery') || d.includes('market') || d.includes('shop')) return 'cart';
+  if (d.includes('netflix') || d.includes('spotify') || d.includes('subscription')) return 'play-circle';
+  if (d.includes('salary') || d.includes('income') || d.includes('deposit')) return 'cash';
+  return 'pricetag';
 }
 
-const SEED_TRANSACTIONS = [
-  { id: 's1', title: 'Whole Foods Market', amount: '-$84.20', date: 'Today, 2:15 PM', icon: 'cart' },
-  { id: 's2', title: 'Salary Deposit', amount: '+$3,200.00', date: 'Yesterday', icon: 'cash' },
-  { id: 's3', title: 'Netflix Subscription', amount: '-$15.99', date: 'May 10', icon: 'play-circle' },
-];
-
-function parseTransaction(text: string): LoggedTx {
-  const amountMatch = text.match(/\$[\d,.]+/);
-  const amount = amountMatch ? amountMatch[0] : '$0';
-  const lower = text.toLowerCase();
-  let category = 'General';
-  let icon = 'pricetag';
-  if (lower.includes('coffee') || lower.includes('cafe') || lower.includes('starbucks')) { category = 'Coffee'; icon = 'cafe'; }
-  else if (lower.includes('lunch') || lower.includes('dinner') || lower.includes('food') || lower.includes('restaurant')) { category = 'Food & Dining'; icon = 'restaurant'; }
-  else if (lower.includes('uber') || lower.includes('lyft') || lower.includes('gas') || lower.includes('transport')) { category = 'Transport'; icon = 'car'; }
-  else if (lower.includes('grocery') || lower.includes('market') || lower.includes('shop')) { category = 'Groceries'; icon = 'cart'; }
-  else if (lower.includes('netflix') || lower.includes('spotify') || lower.includes('subscription')) { category = 'Subscription'; icon = 'play-circle'; }
-  const title = category === 'General' ? text.replace(/spent|paid|bought/gi, '').replace(/\$[\d,.]+/g, '').replace(/on|for/gi, '').trim() || 'Transaction' : category;
-  return { id: Date.now().toString(), title, amount: `-${amount}`, category, icon };
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  if (diff < 60_000) return 'Just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  if (diff < 86_400_000) return `Today, ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  if (diff < 172_800_000) return 'Yesterday';
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-/* ── Card Sub-components ── */
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning,';
+  if (h < 17) return 'Good afternoon,';
+  return 'Good evening,';
+}
+
 function CardChip() {
   return (
     <View style={chipS.body}>
@@ -47,45 +57,84 @@ function CardChip() {
 }
 
 export default function DashboardScreen() {
+  // ── Live data state ──
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [summary, setSummary] = useState<MonthSummary>({ income: 0, expense: 0, balance: 0 });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ── Chat state ──
   const [logText, setLogText] = useState('');
   const [chatState, setChatState] = useState<'idle' | 'sent' | 'processing' | 'done'>('idle');
-  const [lastTx, setLastTx] = useState<LoggedTx | null>(null);
-  const [loggedTxs, setLoggedTxs] = useState<LoggedTx[]>([]);
+  const [lastTxText, setLastTxText] = useState('');
 
-  // Animations
+  // ── Animations ──
   const bubbleAnim = useRef(new Animated.Value(0)).current;
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const cardAnim = useRef(new Animated.Value(0)).current;
   const checkScale = useRef(new Animated.Value(0)).current;
   const confettiAnims = useRef(
     Array.from({ length: 6 }, () => ({
-      x: new Animated.Value(0),
-      y: new Animated.Value(0),
-      opacity: new Animated.Value(0),
-      scale: new Animated.Value(0),
+      x: new Animated.Value(0), y: new Animated.Value(0),
+      opacity: new Animated.Value(0), scale: new Animated.Value(0),
     }))
   ).current;
 
+  // Result from the last logged transaction
+  const [lastResult, setLastResult] = useState<{ description: string; amount: number; type: string; icon: string } | null>(null);
+
+  const fmt = currencyFormatter(profile?.currency);
+  const primaryAccount = accounts[0]; // The default Cash account
+  const totalBalance = accounts.reduce((sum, a) => sum + Number(a.balance), 0);
+
+  // ── Fetch all dashboard data ──
+  const loadData = useCallback(async () => {
+    try {
+      const [p, a, s, t] = await Promise.all([
+        getProfile(),
+        getAccounts(),
+        getMonthSummary(),
+        getRecentTransactions(15),
+      ]);
+      setProfile(p);
+      setAccounts(a);
+      setSummary(s);
+      setTransactions(t);
+    } catch (e: any) {
+      console.error('Dashboard load error:', e.message);
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
+
+  // ── Animation helpers ──
   const resetAnims = () => {
-    bubbleAnim.setValue(0);
-    shimmerAnim.setValue(0);
-    cardAnim.setValue(0);
-    checkScale.setValue(0);
+    bubbleAnim.setValue(0); shimmerAnim.setValue(0); cardAnim.setValue(0); checkScale.setValue(0);
     confettiAnims.forEach(c => { c.x.setValue(0); c.y.setValue(0); c.opacity.setValue(0); c.scale.setValue(0); });
   };
 
-  const handleSend = () => {
-    if (!logText.trim()) return;
-    const tx = parseTransaction(logText);
-    setLastTx(tx);
+  const handleSend = async () => {
+    if (!logText.trim() || !primaryAccount) return;
+    const text = logText;
     setLogText('');
+    setLastTxText(text);
     resetAnims();
 
-    // Stage 1: User message bubble slides up
+    // Stage 1: Bubble
     setChatState('sent');
     Animated.spring(bubbleAnim, { toValue: 1, friction: 7, tension: 60, useNativeDriver: true }).start();
 
-    // Stage 2: Shimmer processing
+    // Stage 2: Shimmer
     setTimeout(() => {
       setChatState('processing');
       Animated.loop(
@@ -94,49 +143,72 @@ export default function DashboardScreen() {
       ).start();
     }, 500);
 
-    // Stage 3: Result card pops in + check + confetti
-    setTimeout(() => {
-      setChatState('done');
-      Animated.spring(cardAnim, { toValue: 1, friction: 6, tension: 50, useNativeDriver: true }).start();
+    // Actual DB insert happens during processing
+    try {
+      const result = await logTransaction(text, primaryAccount.id);
+      const icon = txIcon(result);
+      setLastResult({ description: result.description, amount: result.amount, type: result.type, icon });
 
+      // Stage 3: Result card
       setTimeout(() => {
-        Animated.spring(checkScale, { toValue: 1, friction: 4, tension: 100, useNativeDriver: true }).start();
-        // Confetti burst
-        confettiAnims.forEach((c) => {
-          const angle = Math.random() * Math.PI * 2;
-          const dist = 40 + Math.random() * 60;
-          Animated.parallel([
-            Animated.timing(c.opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
-            Animated.timing(c.scale, { toValue: 1, duration: 200, useNativeDriver: true }),
-            Animated.timing(c.x, { toValue: Math.cos(angle) * dist, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.timing(c.y, { toValue: Math.sin(angle) * dist, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.sequence([
-              Animated.delay(300),
-              Animated.timing(c.opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
-            ]),
-          ]).start();
-        });
-      }, 300);
+        setChatState('done');
+        Animated.spring(cardAnim, { toValue: 1, friction: 6, tension: 50, useNativeDriver: true }).start();
 
-      // Stage 4: Add to list and reset
-      setTimeout(() => {
-        setLoggedTxs(prev => [tx, ...prev]);
-        setChatState('idle');
-        setLastTx(null);
-      }, 2200);
-    }, 1400);
+        setTimeout(() => {
+          Animated.spring(checkScale, { toValue: 1, friction: 4, tension: 100, useNativeDriver: true }).start();
+          confettiAnims.forEach((c) => {
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 40 + Math.random() * 60;
+            Animated.parallel([
+              Animated.timing(c.opacity, { toValue: 1, duration: 100, useNativeDriver: true }),
+              Animated.timing(c.scale, { toValue: 1, duration: 200, useNativeDriver: true }),
+              Animated.timing(c.x, { toValue: Math.cos(angle) * dist, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.timing(c.y, { toValue: Math.sin(angle) * dist, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+              Animated.sequence([Animated.delay(300), Animated.timing(c.opacity, { toValue: 0, duration: 200, useNativeDriver: true })]),
+            ]).start();
+          });
+        }, 300);
+
+        // Stage 4: Refresh data and reset
+        setTimeout(() => {
+          loadData();
+          setChatState('idle');
+          setLastResult(null);
+        }, 2200);
+      }, 400);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to log transaction');
+      setChatState('idle');
+    }
   };
 
   const shimmerTranslate = shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-CARD_WIDTH, CARD_WIDTH] });
 
+  // ── Loading state ──
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={Colors.finoraGreen} />
+      </SafeAreaView>
+    );
+  }
+
+  const displayName = profile?.display_name ?? 'there';
+  const cardholderName = displayName.toUpperCase().split(' ')[0] + (displayName.split(' ')[1] ? ` ${displayName.split(' ')[1][0]}.` : '');
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.finoraGreen} />}
+      >
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Good morning,</Text>
-            <Text style={styles.headerName}>Stanley</Text>
+            <Text style={styles.greeting}>{getGreeting()}</Text>
+            <Text style={styles.headerName}>{displayName}</Text>
           </View>
           <TouchableOpacity style={styles.avatarWrap}>
             <Image source={require('../../assets/finora-icon.png')} style={styles.avatarImg} resizeMode="cover" />
@@ -167,7 +239,7 @@ export default function DashboardScreen() {
                 <Text style={styles.lastFour}>7842</Text>
               </View>
               <View style={styles.cardBot}>
-                <View><Text style={styles.cardLabel}>CARDHOLDER</Text><Text style={styles.cardVal}>STANLEY W.</Text></View>
+                <View><Text style={styles.cardLabel}>CARDHOLDER</Text><Text style={styles.cardVal}>{cardholderName}</Text></View>
                 <View style={{ alignItems: 'flex-end' }}><Text style={styles.cardLabel}>EXPIRES</Text><Text style={styles.cardVal}>09/28</Text></View>
               </View>
             </View>
@@ -176,11 +248,11 @@ export default function DashboardScreen() {
 
         {/* Balance Row */}
         <View style={styles.balRow}>
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraGreen }]} /><View><Text style={styles.balLabel}>Income</Text><Text style={styles.balVal}>$4,500</Text></View></View>
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraGreen }]} /><View><Text style={styles.balLabel}>Income</Text><Text style={styles.balVal}>{fmt(summary.income)}</Text></View></View>
           <View style={styles.balDiv} />
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: '#ff6b6b' }]} /><View><Text style={styles.balLabel}>Spent</Text><Text style={styles.balVal}>$1,240</Text></View></View>
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: '#ff6b6b' }]} /><View><Text style={styles.balLabel}>Spent</Text><Text style={styles.balVal}>{fmt(summary.expense)}</Text></View></View>
           <View style={styles.balDiv} />
-          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraSkyBlue }]} /><View><Text style={styles.balLabel}>Balance</Text><Text style={[styles.balVal, { fontWeight: '800' }]}>$12,450</Text></View></View>
+          <View style={styles.balItem}><View style={[styles.balDot, { backgroundColor: Colors.finoraSkyBlue }]} /><View><Text style={styles.balLabel}>Balance</Text><Text style={[styles.balVal, { fontWeight: '800' }]}>{fmt(totalBalance)}</Text></View></View>
         </View>
 
         {/* ══ AI Chat Section ══ */}
@@ -192,14 +264,12 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* User message bubble */}
-          {(chatState === 'sent' || chatState === 'processing' || chatState === 'done') && lastTx && (
+          {(chatState === 'sent' || chatState === 'processing' || chatState === 'done') && (
             <Animated.View style={[styles.userBubble, { opacity: bubbleAnim, transform: [{ translateY: bubbleAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }, { scale: bubbleAnim }] }]}>
-              <Text style={styles.userBubbleText}>{lastTx.amount.replace('-', '')} on {lastTx.title}</Text>
+              <Text style={styles.userBubbleText}>{lastTxText}</Text>
             </Animated.View>
           )}
 
-          {/* Processing shimmer */}
           {chatState === 'processing' && (
             <View style={styles.processingWrap}>
               <View style={styles.processingBar}>
@@ -209,23 +279,21 @@ export default function DashboardScreen() {
             </View>
           )}
 
-          {/* Result card */}
-          {chatState === 'done' && lastTx && (
+          {chatState === 'done' && lastResult && (
             <Animated.View style={[styles.resultCard, { opacity: cardAnim, transform: [{ scale: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }] }]}>
               <View style={styles.resultTop}>
                 <View style={styles.resultIconWrap}>
-                  <Ionicons name={lastTx.icon as any} size={22} color={Colors.finoraGreen} />
+                  <Ionicons name={lastResult.icon as any} size={22} color={Colors.finoraGreen} />
                 </View>
                 <View style={styles.resultInfo}>
-                  <Text style={styles.resultTitle}>{lastTx.title}</Text>
-                  <Text style={styles.resultCat}>{lastTx.category}</Text>
+                  <Text style={styles.resultTitle}>{lastResult.description}</Text>
+                  <Text style={styles.resultCat}>{lastResult.type === 'income' ? 'Income' : 'Expense'}</Text>
                 </View>
-                <Text style={styles.resultAmount}>{lastTx.amount}</Text>
+                <Text style={styles.resultAmount}>{lastResult.type === 'income' ? '+' : '-'}{fmt(lastResult.amount)}</Text>
               </View>
               <View style={styles.resultBot}>
                 <Animated.View style={[styles.checkCircle, { transform: [{ scale: checkScale }] }]}>
                   <Ionicons name="checkmark" size={16} color="#fff" />
-                  {/* Confetti particles */}
                   {confettiAnims.map((c, i) => (
                     <Animated.View key={i} style={[styles.confetti, {
                       backgroundColor: ['#58cc02', '#1cb0f6', '#ffc700', '#ff6b6b', '#a570ff', '#58cc02'][i],
@@ -239,7 +307,6 @@ export default function DashboardScreen() {
             </Animated.View>
           )}
 
-          {/* Input */}
           <View style={styles.inputRow}>
             <TextInput
               style={styles.chatInput}
@@ -267,18 +334,21 @@ export default function DashboardScreen() {
             <Text style={styles.actTitle}>Recent Activity</Text>
             <TouchableOpacity><Text style={styles.seeAll}>See All</Text></TouchableOpacity>
           </View>
-          {loggedTxs.map(tx => (
+          {transactions.length === 0 && (
+            <Text style={{ color: Colors.textTertiary, textAlign: 'center', paddingVertical: Spacing.xl }}>
+              No transactions yet. Use the chat above to log your first one!
+            </Text>
+          )}
+          {transactions.map(tx => (
             <View key={tx.id} style={styles.txRow}>
-              <View style={styles.txIcon}><Ionicons name={tx.icon as any} size={20} color={Colors.textSecondary} /></View>
-              <View style={{ flex: 1 }}><Text style={styles.txTitle}>{tx.title}</Text><Text style={styles.txDate}>Just now</Text></View>
-              <Text style={styles.txAmt}>{tx.amount}</Text>
-            </View>
-          ))}
-          {SEED_TRANSACTIONS.map(tx => (
-            <View key={tx.id} style={styles.txRow}>
-              <View style={styles.txIcon}><Ionicons name={tx.icon as any} size={20} color={Colors.textSecondary} /></View>
-              <View style={{ flex: 1 }}><Text style={styles.txTitle}>{tx.title}</Text><Text style={styles.txDate}>{tx.date}</Text></View>
-              <Text style={[styles.txAmt, tx.amount.startsWith('+') && { color: Colors.finoraGreenDark }]}>{tx.amount}</Text>
+              <View style={styles.txIcon}><Ionicons name={txIcon(tx) as any} size={20} color={Colors.textSecondary} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.txTitle}>{tx.description}</Text>
+                <Text style={styles.txDate}>{formatDate(tx.transaction_date)}</Text>
+              </View>
+              <Text style={[styles.txAmt, tx.type === 'income' && { color: Colors.finoraGreenDark }]}>
+                {tx.type === 'income' ? '+' : '-'}{fmt(tx.amount)}
+              </Text>
             </View>
           ))}
         </View>
@@ -304,7 +374,6 @@ const styles = StyleSheet.create({
   avatarWrap: { width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.surface, overflow: 'hidden', borderWidth: 2, borderColor: Colors.background, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 },
   avatarImg: { width: '100%', height: '100%' },
 
-  // Wallet
   walletWrap: { width: CARD_WIDTH, height: CARD_HEIGHT + 24, marginBottom: Spacing.xl, alignSelf: 'center' },
   backCard: { position: 'absolute', width: CARD_WIDTH, height: CARD_HEIGHT, borderRadius: 20 },
   bc2: { backgroundColor: '#e8e8e8', top: 16, transform: [{ scale: 0.92 }] },
@@ -326,7 +395,6 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 9, fontWeight: '500', color: 'rgba(255,255,255,0.4)', letterSpacing: 1.5, marginBottom: 2 },
   cardVal: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)', letterSpacing: 1 },
 
-  // Balance
   balRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.surface, padding: Spacing.base, borderRadius: BorderRadius.lg, marginBottom: Spacing['3xl'] },
   balItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   balDot: { width: 8, height: 8, borderRadius: 4 },
@@ -334,7 +402,6 @@ const styles = StyleSheet.create({
   balVal: { fontSize: 14, fontWeight: '600', color: Colors.text },
   balDiv: { width: 1, height: 28, backgroundColor: Colors.border, marginHorizontal: 4 },
 
-  // Chat
   chatSection: { marginBottom: Spacing['4xl'] },
   aiBubble: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: Colors.finoraGreen + '15', paddingVertical: 8, paddingHorizontal: 16, borderRadius: BorderRadius.pill, borderBottomLeftRadius: 4, marginBottom: Spacing.sm },
   aiBubbleText: { fontSize: Typography.sizes.caption, fontWeight: '500', color: Colors.finoraGreenDark },
@@ -362,7 +429,6 @@ const styles = StyleSheet.create({
   sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.border, alignItems: 'center', justifyContent: 'center', marginLeft: Spacing.sm },
   sendBtnActive: { backgroundColor: Colors.finoraGreen, shadowColor: Colors.finoraGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 4 },
 
-  // Activity
   actSection: { marginBottom: Spacing.xl },
   actHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.lg },
   actTitle: { fontSize: Typography.sizes.subheading, fontWeight: '700', color: Colors.text },
