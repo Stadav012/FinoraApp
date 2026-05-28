@@ -1,3 +1,5 @@
+import { Alert, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase'; 
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,6 +16,30 @@ const GOALS = [
 
 export default function GoalScreen() {
   const [selectedGoal, setSelectedGoal] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleContinue = async () => {
+      if (!selectedGoal) return;
+      setIsLoading(true);
+  
+      // getting currently logged user to update their profile with the selected financial_goal
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase
+          .from('profiles')
+          .update({ financial_goal: selectedGoal })
+          .eq('id', user.id);
+  
+        if (error) {
+          Alert.alert('Error saving financial_goal', error.message);
+          setIsLoading(false);
+          return;
+        }
+      }
+      // if successfully updated, navigate to the next onboarding screen
+      setIsLoading(false);
+      router.push('/onboarding/knowledge' as any);
+    };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -61,10 +87,14 @@ export default function GoalScreen() {
         <TouchableOpacity
           style={[styles.continueButton, !selectedGoal && styles.continueButtonDisabled]}
           activeOpacity={0.8}
-          onPress={() => router.push('/onboarding/knowledge' as any)}
-          disabled={!selectedGoal}
+          onPress={handleContinue}
+          disabled={!selectedGoal || isLoading}
         >
-          <Text style={styles.continueButtonText}>Continue</Text>
+          {isLoading ? (
+            <ActivityIndicator color={Colors.background} />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

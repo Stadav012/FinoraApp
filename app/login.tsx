@@ -1,3 +1,5 @@
+import { Alert, ActivityIndicator } from 'react-native';
+import { supabase } from '../lib/supabase';
 import React, { useState } from 'react';
 import {
   StyleSheet,
@@ -18,14 +20,32 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const isValid = email.trim().length > 0 && password.length > 0;
 
-  const handleLogin = () => {
-    // In a real app, this would verify credentials via an API
-    // For now, route directly to the dashboard
+  // const handleLogin = () => {
+  //   // In a real app, this would verify credentials via an API
+  //   // For now, route directly to the dashboard
+  //   router.replace('/(tabs)' as any);
+  // };
+  const handleLogin = async () => {
+  if (!isValid) return;
+  setIsLoading(true);
+
+  const { error } = await supabase.auth.signInWithPassword({
+    email: email.trim(),
+    password: password,
+  });
+
+  setIsLoading(false);
+
+  if (error) {
+    Alert.alert('Login Failed', error.message);
+  } else {
     router.replace('/(tabs)' as any);
-  };
+  }
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -98,9 +118,13 @@ export default function LoginScreen() {
             style={[styles.continueButton, !isValid && styles.continueButtonDisabled]}
             activeOpacity={0.8}
             onPress={handleLogin}
-            disabled={!isValid}
+            disabled={!isValid || isLoading}
           >
-            <Text style={styles.continueButtonText}>Log In</Text>
+            {isLoading ? (
+              <ActivityIndicator color={Colors.background} />
+            ) : (
+              <Text style={styles.continueButtonText}>Log In</Text>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
