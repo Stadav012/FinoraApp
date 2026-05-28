@@ -91,84 +91,136 @@ function GoalCard({
   onAddFunds: (g: Goal) => void; onDelete: (id: string) => void;
 }) {
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const barAnim = useRef(new Animated.Value(0)).current;
+  const ringAnim = useRef(new Animated.Value(0)).current;
+  const glowPulse = useRef(new Animated.Value(0.6)).current;
   const progress = Number(goal.current_amount) / Number(goal.target_amount);
+  const percentText = Math.round(progress * 100);
 
   useEffect(() => {
     Animated.sequence([
-      Animated.delay(index * 120),
+      Animated.delay(index * 150),
       Animated.parallel([
-        Animated.spring(slideAnim, { toValue: 1, friction: 8, tension: 50, useNativeDriver: true }),
-        Animated.timing(barAnim, {
+        Animated.spring(slideAnim, { toValue: 1, friction: 8, tension: 45, useNativeDriver: true }),
+        Animated.timing(ringAnim, {
           toValue: Math.min(progress, 1),
-          duration: 800,
-          delay: 200,
+          duration: 1000,
+          delay: 300,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: false,
         }),
       ]),
     ]).start();
+
+    // Subtle pulse on the icon glow
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowPulse, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        Animated.timing(glowPulse, { toValue: 0.6, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      ])
+    ).start();
   }, []);
 
   const daysLeft = goal.deadline
     ? Math.max(0, Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000))
     : null;
 
+  const remaining = Math.max(0, Number(goal.target_amount) - Number(goal.current_amount));
+
   return (
-    <Animated.View style={[styles.goalCard, {
+    <Animated.View style={[gcStyles.card, {
       opacity: slideAnim,
-      transform: [{ translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [30, 0] }) }],
+      transform: [
+        { translateY: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) },
+        { scale: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) },
+      ],
     }]}>
-      {/* Color accent */}
-      <View style={[styles.cardAccent, { backgroundColor: goal.color }]} />
+      {/* Dark card base */}
+      <View style={gcStyles.cardInner}>
+        {/* Ambient blobs */}
+        <Animated.View style={[gcStyles.blob1, { backgroundColor: goal.color, opacity: glowPulse }]} />
+        <View style={[gcStyles.blob2, { backgroundColor: goal.color }]} />
+        <View style={[gcStyles.blob3, { backgroundColor: '#fff' }]} />
 
-      <View style={styles.cardBody}>
-        <View style={styles.cardTop}>
-          <View style={[styles.cardIconWrap, { backgroundColor: goal.color + '18' }]}>
-            <Ionicons name={goal.icon as any} size={22} color={goal.color} />
-          </View>
-          <View style={styles.cardInfo}>
-            <Text style={styles.cardName}>{goal.name}</Text>
-            <Text style={styles.cardMeta}>
-              {goal.is_completed ? '🎉 Completed!' : daysLeft !== null ? `${daysLeft} days left` : 'No deadline'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => {
-              Alert.alert('Delete Goal', `Remove "${goal.name}"?`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Delete', style: 'destructive', onPress: () => onDelete(goal.id) },
-              ]);
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="ellipsis-horizontal" size={20} color={Colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Progress bar */}
-        <View style={styles.progressBarBg}>
-          <Animated.View style={[styles.progressBarFill, {
-            backgroundColor: goal.color,
-            width: barAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-          }]} />
-        </View>
-
-        <View style={styles.cardBottom}>
-          <Text style={styles.cardAmount}>
-            <Text style={{ color: goal.color, fontWeight: '800' }}>{fmt(Number(goal.current_amount))}</Text>
-            <Text style={{ color: Colors.textTertiary }}> / {fmt(Number(goal.target_amount))}</Text>
-          </Text>
-          {!goal.is_completed && (
-            <TouchableOpacity style={[styles.addBtn, { backgroundColor: goal.color }]} onPress={() => onAddFunds(goal)}>
-              <Ionicons name="add" size={18} color="#fff" />
+        {/* Glass overlay */}
+        <View style={gcStyles.glass}>
+          {/* Top row: icon + name + menu */}
+          <View style={gcStyles.topRow}>
+            <View style={gcStyles.iconWrap}>
+              <Ionicons name={goal.icon as any} size={20} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={gcStyles.name} numberOfLines={1}>{goal.name}</Text>
+              <Text style={gcStyles.meta}>
+                {goal.is_completed ? '✨ Goal reached' : daysLeft !== null ? `${daysLeft}d remaining` : 'Open-ended'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert('Delete Goal', `Remove "${goal.name}"?`, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Delete', style: 'destructive', onPress: () => onDelete(goal.id) },
+                ]);
+              }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              style={gcStyles.menuBtn}
+            >
+              <Ionicons name="ellipsis-horizontal" size={16} color="rgba(255,255,255,0.4)" />
             </TouchableOpacity>
-          )}
+          </View>
+
+          {/* Center: amount + mini ring */}
+          <View style={gcStyles.centerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={gcStyles.savedAmount}>{fmt(Number(goal.current_amount))}</Text>
+              <Text style={gcStyles.targetText}>of {fmt(Number(goal.target_amount))}</Text>
+            </View>
+
+            {/* Mini progress ring */}
+            <View style={gcStyles.miniRingWrap}>
+              <View style={gcStyles.miniRingBg} />
+              <Animated.View style={[gcStyles.miniRingFg, {
+                borderColor: '#fff',
+                borderTopColor: ringAnim.interpolate({
+                  inputRange: [0, 0.25, 1], outputRange: ['rgba(255,255,255,0.12)', '#fff', '#fff'],
+                }),
+                borderRightColor: ringAnim.interpolate({
+                  inputRange: [0, 0.25, 0.5, 1], outputRange: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.12)', '#fff', '#fff'],
+                }),
+                borderBottomColor: ringAnim.interpolate({
+                  inputRange: [0, 0.5, 0.75, 1], outputRange: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.12)', '#fff', '#fff'],
+                }),
+                borderLeftColor: ringAnim.interpolate({
+                  inputRange: [0, 0.75, 1], outputRange: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.12)', '#fff'],
+                }),
+              }]} />
+              <Text style={gcStyles.ringPercent}>{percentText}%</Text>
+            </View>
+          </View>
+
+          {/* Bottom: progress bar + add button */}
+          <View style={gcStyles.bottomRow}>
+            <View style={gcStyles.barWrap}>
+              <Animated.View style={[gcStyles.barFill, {
+                width: ringAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              }]} />
+            </View>
+            {!goal.is_completed ? (
+              <TouchableOpacity style={gcStyles.addFundsBtn} onPress={() => onAddFunds(goal)} activeOpacity={0.7}>
+                <Ionicons name="add" size={14} color={goal.color} />
+                <Text style={[gcStyles.addFundsText, { color: goal.color }]}>Add</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={gcStyles.completedBadge}>
+                <Ionicons name="checkmark" size={14} color="#fff" />
+              </View>
+            )}
+          </View>
         </View>
       </View>
     </Animated.View>
   );
 }
+
 
 // ══════════════════════════════════════════════
 // MAIN GOALS SCREEN
@@ -451,31 +503,6 @@ const styles = StyleSheet.create({
   heroStatLabel: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   heroStatDiv: { width: 1, height: 28, backgroundColor: Colors.border },
 
-  // Goal card
-  goalCard: {
-    flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: BorderRadius['2xl'],
-    marginBottom: Spacing.md, overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
-  },
-  cardAccent: { width: 4, borderTopLeftRadius: BorderRadius['2xl'], borderBottomLeftRadius: BorderRadius['2xl'] },
-  cardBody: { flex: 1, padding: Spacing.base },
-  cardTop: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.md },
-  cardIconWrap: {
-    width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
-  },
-  cardInfo: { flex: 1 },
-  cardName: { fontSize: Typography.sizes.body, fontWeight: '600', color: Colors.text },
-  cardMeta: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  progressBarBg: {
-    height: 6, backgroundColor: Colors.borderSubtle, borderRadius: 3, marginBottom: Spacing.sm, overflow: 'hidden',
-  },
-  progressBarFill: { height: '100%', borderRadius: 3 },
-  cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardAmount: { fontSize: Typography.sizes.caption },
-  addBtn: {
-    width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
-  },
-
   // Empty state
   emptyState: { alignItems: 'center', paddingVertical: Spacing['4xl'] },
   emptyIcon: {
@@ -497,6 +524,107 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md,
   },
   newGoalText: { fontSize: Typography.sizes.body, fontWeight: '600', color: Colors.finoraGreenDark },
+});
+
+// ── Premium Goal Card Styles ──
+const gcStyles = StyleSheet.create({
+  card: {
+    marginBottom: Spacing.lg,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  cardInner: {
+    borderRadius: 20,
+    backgroundColor: '#1a1a2e',
+    overflow: 'hidden',
+    minHeight: 180,
+  },
+  blob1: {
+    position: 'absolute', top: -30, right: -20,
+    width: 120, height: 120, borderRadius: 60, opacity: 0.35,
+  },
+  blob2: {
+    position: 'absolute', bottom: -40, left: -15,
+    width: 100, height: 100, borderRadius: 50, opacity: 0.15,
+  },
+  blob3: {
+    position: 'absolute', top: 30, left: '45%',
+    width: 60, height: 60, borderRadius: 30, opacity: 0.04,
+  },
+  glass: {
+    flex: 1, padding: 20, justifyContent: 'space-between',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  topRow: {
+    flexDirection: 'row', alignItems: 'center', marginBottom: 16,
+  },
+  iconWrap: {
+    width: 38, height: 38, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+    marginRight: 12,
+  },
+  name: {
+    fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.3,
+  },
+  meta: {
+    fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 2,
+  },
+  menuBtn: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  centerRow: {
+    flexDirection: 'row', alignItems: 'center', marginBottom: 16,
+  },
+  savedAmount: {
+    fontSize: 28, fontWeight: '800', color: '#fff', letterSpacing: -0.5,
+  },
+  targetText: {
+    fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 2,
+  },
+  miniRingWrap: {
+    width: 52, height: 52, alignItems: 'center', justifyContent: 'center',
+  },
+  miniRingBg: {
+    position: 'absolute', width: 52, height: 52, borderRadius: 26,
+    borderWidth: 3, borderColor: 'rgba(255,255,255,0.12)',
+  },
+  miniRingFg: {
+    position: 'absolute', width: 52, height: 52, borderRadius: 26,
+    borderWidth: 3, transform: [{ rotate: '-90deg' }],
+  },
+  ringPercent: {
+    fontSize: 13, fontWeight: '700', color: '#fff',
+  },
+  bottomRow: {
+    flexDirection: 'row', alignItems: 'center',
+  },
+  barWrap: {
+    flex: 1, height: 4, backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 2, overflow: 'hidden', marginRight: 12,
+  },
+  barFill: {
+    height: '100%', borderRadius: 2, backgroundColor: '#fff',
+  },
+  addFundsBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  addFundsText: {
+    fontSize: 12, fontWeight: '700',
+  },
+  completedBadge: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
 });
 
 const modalS = StyleSheet.create({
