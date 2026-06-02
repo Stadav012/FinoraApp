@@ -165,42 +165,76 @@ export async function logTransaction(
   text: string,
   accountId: string,
 ): Promise<Transaction> {
-  const userId = await getUserId();
+  
+  try {
+    // attempt first to use the AI service to log a transaction
+    const { data: { session }, error } = await supabase.auth.getSession();
+    if (error || !session) throw new Error('Not authenticated');
 
-  // Simple frontend parser — extracts amount and guesses type
-  const amountMatch = text.match(/\$?([\d,]+\.?\d*)/);
-  const rawAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+    // Dynamically build the URL using your new environment variable
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+    if (!baseUrl) throw new Error('API URL is not defined in environment variables');
 
-  // Determine if it's income or expense from keywords
-  const lower = text.toLowerCase();
-  const isIncome = lower.includes('received') || lower.includes('earned')
-    || lower.includes('salary') || lower.includes('got paid')
-    || lower.includes('income') || lower.includes('deposit');
+    const API_URL = `${baseUrl}/api/transactions/parse`; 
 
-  const type: 'income' | 'expense' = isIncome ? 'income' : 'expense';
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ text, accountId })
+    });
 
-  // Build a clean description
-  let description = text.trim();
-  // Remove leading "spent", "paid", etc. for cleaner storage
-  description = description
-    .replace(/^(spent|paid|bought)\s+/i, '')
-    .replace(/\$[\d,.]+\s*(on|for)?\s*/i, '')
-    .trim() || text.trim();
+    if (!response.ok) {
+      throw new Error('AI server responded with an error');
+    }
 
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({
-      user_id: userId,
-      account_id: accountId,
-      description,
-      amount: rawAmount,
-      type,
-      transaction_date: new Date().toISOString(),
-      parsed_from: text,
-    })
-    .select('id, description, amount, type, transaction_date, parsed_from')
-    .single();
+    const transactionData = await response.json();
+    return transactionData as Transaction;
 
-  if (error) throw error;
-  return data as Transaction;
+  } catch (error) {
+    // regex fallback in case of AI service failure
+    console.warn('AI Parsing failed, falling back to local regex:', error);
+
+    // Regex Math
+    const amountMatch = text.match(/\$?([\d,]+\.?\d*)/);
+    const rawAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+
+    const lower = text.toLowerCase();
+    const isIncome = lower.includes('received') || lower.includes('earned')
+      || lower.includes('salary') || lower.includes('got paid')
+      || lower.includes('income') || lower.includes('deposit');
+
+    const type: 'income' | 'expense' = isIncome ? 'income' : 'expense';
+
+    let description = text.trim()
+      .replace(/^(spent|paid|bought)\s+/i, '')
+      .replace(/\$[\d,.]+\s*(on|for)?\s*/i, '')
+      .trim() || text.trim();
+
+    // User ID directly from the phone's session
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) throw new Error('Not authenticated for fallback saving');
+
+    // Save directly to Supabase from the phone
+    const { data, error: dbError } = await supabase
+      .from('transactions')
+      .insert({
+        user_id: user.id,
+        account_id: accountId,
+        description,
+        amount: rawAmount,
+        type,
+        transaction_date: new Date().toISOString(),
+        parsed_from: text,
+      })
+      .select('id, description, amount, type, transaction_date, parsed_from')
+      .single();
+
+    if (dbError) throw dbError;
+    
+    return data as Transaction;
+  }
 }
+// awesome, done that i'd like to handle the IP issue in an env though also what about the routes setting and in server.js(ps; my server.js in api/ is blank)
