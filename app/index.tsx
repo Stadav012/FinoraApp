@@ -9,6 +9,8 @@ import {
 import { router } from 'expo-router';
 import { Colors } from '../constants/theme';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../lib/supabase';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 const ICON_SIZE = width * 0.35;
@@ -35,24 +37,32 @@ export default function SplashScreen() {
       }),
     ]).start();
 
-    // Hold, then fade out and navigate
-    const timer = setTimeout(() => {
-      Animated.timing(screenOpacity, {
-        toValue: 0,
-        duration: 350,
-        easing: Easing.in(Easing.cubic),
-        useNativeDriver: true,
-      }).start(() => {
-        router.replace('/auth');
-      });
-    }, 2000);
+    // Check for existing session while splash plays
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const destination = session ? '/(tabs)' : '/auth';
 
-    return () => clearTimeout(timer);
+      // Wait for splash animation to finish (minimum 1.5s)
+      setTimeout(() => {
+        Animated.timing(screenOpacity, {
+          toValue: 0,
+          duration: 350,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }).start(() => {
+          router.replace(destination as any);
+        });
+      }, 1500);
+    };
+
+    checkSession();
   }, []);
 
+  const { colors, isDark } = useTheme();
+
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-      <StatusBar style="dark" />
+    <Animated.View style={[styles.container, { opacity: screenOpacity, backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Animated.View
         style={[
           styles.iconWrapper,
