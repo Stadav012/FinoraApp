@@ -30,7 +30,7 @@ const handleSignup = async () => {
     if (!isValid) return;
     setIsLoading(true);
 
-    const { data, error } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password: password,
       options: {
@@ -38,26 +38,22 @@ const handleSignup = async () => {
       },
     });
 
-    if (error) {
-      console.error('Signup error:', error);
-    }
-
-    // logging in automatically after signup to ensure we have a valid session
-    if (!data.session) {
-      const { error: loginError } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: password,
-      });
-
-      if (loginError) {
-        Alert.alert('Auto-login Failed', loginError.message);
-        setIsLoading(false);
-        return;
-      }
-    }
-
     setIsLoading(false);
-    router.push('/onboarding/currency' as any);
+
+    if (error) {
+      if (Platform.OS === 'web') {
+        window.alert('Signup error: ' + error.message);
+      } else {
+        Alert.alert('Signup error', error.message);
+      }
+      return;
+    }
+
+    // Pass the email parameter to the verify screen so the input is pre-filled!
+    router.push({
+      pathname: '/verify-email',
+      params: { email: email.trim() }
+    });
   };
 
   return (
